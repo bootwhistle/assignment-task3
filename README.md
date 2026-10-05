@@ -1,14 +1,23 @@
 # Volunteam App
 
+## Running the app
+
+Requires Node 20+ and the Expo Go app (SDK 57) on your phone.
+
+```
+npm install
+npx expo start
+```
+
 ## Setting up the fake API (json-server)
 
-Update the file `src/services/api.ts`.
-
-Before running your 'json-server', get your computer's IP address and update your baseURL to `http://your_ip_address_here:3333` and then run:
+The app finds json-server automatically: it uses the IP address of the computer running the Expo dev server (see `src/services/api.ts`). Start json-server on all network interfaces:
 
 ```
-npx json-server --watch db.json --port 3333 --host your_ip_address_here -m ./node_modules/json-server-auth
+npx json-server --watch db.json --port 3333 --host 0.0.0.0 -m ./node_modules/json-server-auth
 ```
+
+All seed users in `db.json` use the password `123456` (e.g. `eva.young@example.com`).
 
 To access your server online without running json-server locally, you can set your baseURL to:
 
