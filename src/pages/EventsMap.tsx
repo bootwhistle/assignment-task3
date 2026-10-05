@@ -1,23 +1,69 @@
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { StackScreenProps } from '@react-navigation/stack';
-import React, { useContext, useRef } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import * as Location from 'expo-location';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Image, ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
 import { RectButton } from 'react-native-gesture-handler';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { LatLng, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import customMapStyle from '../../map-style.json';
 import * as MapSettings from '../constants/MapSettings';
 import { AuthenticationContext } from '../context/AuthenticationContext';
+import mapMarkerBlueImg from '../images/map-marker-blue.png';
+import mapMarkerGreyImg from '../images/map-marker-grey.png';
 import mapMarkerImg from '../images/map-marker.png';
+import { AppStackParamList } from '../routes/AppStack';
+import * as api from '../services/api';
+import { EventStatus, VolunteeringEvent } from '../types/Event';
+import { getEventStatus, isFutureEvent } from '../utils/events';
 
-export default function EventsMap(props: StackScreenProps<any>) {
+const markerImages: Record<EventStatus, ImageSourcePropType> = {
+    open: mapMarkerImg,
+    volunteered: mapMarkerBlueImg,
+    full: mapMarkerGreyImg,
+};
+
+export default function EventsMap(props: StackScreenProps<AppStackParamList, 'EventsMap'>) {
     const { navigation } = props;
     const authenticationContext = useContext(AuthenticationContext);
+    const currentUserId = authenticationContext?.value?.id;
     const mapViewRef = useRef<MapView>(null);
+    const [isMapReady, setIsMapReady] = useState(false);
+    const [events, setEvents] = useState<VolunteeringEvent[]>([]);
+    const [userLocation, setUserLocation] = useState<LatLng>();
+
+    // Reload events and the user location every time the map screen gets focus,
+    // so changes made on the details screen (e.g. volunteering) are reflected here.
+    useFocusEffect(
+        useCallback(() => {
+            api.getEvents()
+                .then((response) => setEvents(response.data.filter(isFutureEvent)))
+                .catch((error) => console.log(error));
+            getUserLocation().then(setUserLocation);
+        }, [])
+    );
+
+    useEffect(() => {
+        if (isMapReady) fitMapToContent();
+    }, [isMapReady, events, userLocation]);
+
+    const fitMapToContent = () => {
+        const coordinates = events.map(({ position }) => position);
+        if (userLocation) coordinates.push(userLocation);
+
+        if (coordinates.length > 1) {
+            mapViewRef.current?.fitToCoordinates(coordinates, { edgePadding: MapSettings.EDGE_PADDING });
+        } else if (coordinates.length === 1) {
+            mapViewRef.current?.animateToRegion({ ...coordinates[0], ...MapSettings.DEFAULT_DELTA });
+        }
+    };
 
     const handleNavigateToCreateEvent = () => {};
 
-    const handleNavigateToEventDetails = () => {};
+    const handleNavigateToEventDetails = (event: VolunteeringEvent) => {
+        navigation.navigate('EventDetails', { event });
+    };
 
     const handleLogout = async () => {
         AsyncStorage.multiRemove(['userInfo', 'accessToken']).then(() => {
@@ -40,15 +86,7 @@ export default function EventsMap(props: StackScreenProps<any>) {
                 toolbarEnabled={false}
                 moveOnMarkerPress={false}
                 mapPadding={MapSettings.EDGE_PADDING}
-                onLayout={() =>
-                    mapViewRef.current?.fitToCoordinates(
-                        events.map(({ position }) => ({
-                            latitude: position.latitude,
-                            longitude: position.longitude,
-                        })),
-                        { edgePadding: MapSettings.EDGE_PADDING }
-                    )
-                }
+                onMapReady={() => setIsMapReady(true)}
             >
                 {events.map((event) => {
                     return (
@@ -58,16 +96,20 @@ export default function EventsMap(props: StackScreenProps<any>) {
                                 latitude: event.position.latitude,
                                 longitude: event.position.longitude,
                             }}
-                            onPress={handleNavigateToEventDetails}
+                            onPress={() => handleNavigateToEventDetails(event)}
                         >
-                            <Image resizeMode="contain" style={{ width: 48, height: 54 }} source={mapMarkerImg} />
+                            <Image
+                                resizeMode="contain"
+                                style={{ width: 48, height: 54 }}
+                                source={markerImages[getEventStatus(event, currentUserId)]}
+                            />
                         </Marker>
                     );
                 })}
             </MapView>
 
             <View style={styles.footer}>
-                <Text style={styles.footerText}>X event(s) found</Text>
+                <Text style={styles.footerText}>{events.length} event(s) found</Text>
                 <RectButton
                     style={[styles.smallButton, { backgroundColor: '#00A3FF' }]}
                     onPress={handleNavigateToCreateEvent}
@@ -138,41 +180,16 @@ const styles = StyleSheet.create({
     },
 });
 
-interface event {
-    id: string;
-    position: {
-        latitude: number;
-        longitude: number;
-    };
-}
+const getUserLocation = async (): Promise<LatLng | undefined> => {
+    try {
+        const { granted } = await Location.requestForegroundPermissionsAsync();
+        if (!granted) return undefined;
 
-const events: event[] = [
-    {
-        id: 'e3c95682-870f-4080-a0d7-ae8e23e2534f',
-        position: {
-            latitude: 51.105761,
-            longitude: -114.106943,
-        },
-    },
-    {
-        id: '98301b22-2b76-44f1-a8da-8c86c56b0367',
-        position: {
-            latitude: 51.04112,
-            longitude: -114.069325,
-        },
-    },
-    {
-        id: 'd7b8ea73-ba2c-4fc3-9348-9814076124bd',
-        position: {
-            latitude: 51.01222958257112,
-            longitude: -114.11677222698927,
-        },
-    },
-    {
-        id: 'd1a6b9ea-877d-4711-b8d7-af8f1bce4d29',
-        position: {
-            latitude: 51.010801915407036,
-            longitude: -114.07823592424393,
-        },
-    },
-];
+        const location =
+            (await Location.getLastKnownPositionAsync()) ?? (await Location.getCurrentPositionAsync());
+        return { latitude: location.coords.latitude, longitude: location.coords.longitude };
+    } catch (error) {
+        console.log(error);
+        return undefined;
+    }
+};
