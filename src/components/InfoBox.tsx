@@ -1,22 +1,20 @@
 import { Feather } from '@expo/vector-icons';
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { ReactNode } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 interface InfoBoxProps {
     color: string;
-    featherIconName: keyof typeof Feather.glyphMap;
-    lines: string[];
+    backgroundColor: string;
+    borderColor: string;
+    featherIconName?: keyof typeof Feather.glyphMap;
+    children: ReactNode;
 }
 
-export default function InfoBox({ color, featherIconName, lines }: InfoBoxProps) {
+export default function InfoBox({ color, backgroundColor, borderColor, featherIconName, children }: InfoBoxProps) {
     return (
-        <View style={[styles.box, { backgroundColor: color + '1A', borderColor: color + '66' }]}>
-            <Feather name={featherIconName} size={32} color={color} />
-            {lines.map((line) => (
-                <Text key={line} style={[styles.text, { color }]}>
-                    {line}
-                </Text>
-            ))}
+        <View style={[styles.box, { backgroundColor, borderColor }]}>
+            {featherIconName && <Feather style={styles.icon} name={featherIconName} size={40} color={color} />}
+            {children}
         </View>
     );
 }
@@ -24,18 +22,15 @@ export default function InfoBox({ color, featherIconName, lines }: InfoBoxProps)
 const styles = StyleSheet.create({
     box: {
         flex: 1,
+        height: 128,
         borderWidth: 1,
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 20,
-        alignItems: 'flex-start',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        alignItems: 'center',
         justifyContent: 'center',
-        gap: 4,
     },
 
-    text: {
-        fontFamily: 'Nunito_600SemiBold',
-        fontSize: 15,
-        lineHeight: 20,
+    icon: {
+        marginBottom: 12,
     },
 });

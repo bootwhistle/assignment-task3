@@ -80,6 +80,11 @@ export const getMapsUrl = (coordinates: LatLng): string => {
     return Platform.OS === 'ios' ? `maps:0,0?q=${label}@${latLng}` : `geo:0,0?q=${latLng}(${label})`;
 };
 
+export const getDirectionsUrl = ({ latitude, longitude }: LatLng): string => {
+    // Universal Google Maps URL: opens the Maps app (or browser) with directions to the destination
+    return `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+};
+
 export const isTokenExpired = (token: string) => {
     const decodedToken = jwtDecode(token) as JwtPayload;
     const currentDate = Date.now();

@@ -1,28 +1,18 @@
 import { StackScreenProps } from '@react-navigation/stack';
 import React, { useContext, useEffect, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import customMapStyle from '../../map-style.json';
 import BigButton from '../components/BigButton';
 import InfoBox from '../components/InfoBox';
-import Spacer from '../components/Spacer';
+import * as MapSettings from '../constants/MapSettings';
 import { AuthenticationContext } from '../context/AuthenticationContext';
+import mapMarkerImg from '../images/map-marker.png';
 import { AppStackParamList } from '../routes/AppStack';
 import * as api from '../services/api';
-import { EventStatus } from '../types/Event';
 import { User } from '../types/User';
-import { formatAMPM, getMapsUrl } from '../utils';
-import { getEventStatus } from '../utils/events';
-
-const statusColors: Record<EventStatus, string> = {
-    volunteered: '#00A3FF',
-    open: '#FF8700',
-    full: '#8FA7B3',
-};
-
-const statusIcons: Record<EventStatus, 'check' | 'users' | 'slash'> = {
-    volunteered: 'check',
-    open: 'users',
-    full: 'slash',
-};
+import { getDirectionsUrl } from '../utils';
+import { formatEventDate, formatEventTime, getEventStatus } from '../utils/events';
 
 export default function EventDetails({ route, navigation }: StackScreenProps<AppStackParamList, 'EventDetails'>) {
     const authenticationContext = useContext(AuthenticationContext);
@@ -32,21 +22,15 @@ export default function EventDetails({ route, navigation }: StackScreenProps<App
     const [isSaving, setIsSaving] = useState(false);
 
     const status = getEventStatus(event, currentUserId);
-    const eventDate = new Date(event.dateTime);
+    const eventDate = formatEventDate(event.dateTime);
+    const eventTime = formatEventTime(event.dateTime);
+    const organizerPhone = organizer?.mobile.replace(/[^\d+]/g, '');
 
     useEffect(() => {
         api.getUser(event.organizerId)
             .then((response) => setOrganizer(response.data))
             .catch((error) => console.log(error));
     }, [event.organizerId]);
-
-    const statusLines: Record<EventStatus, string[]> = {
-        volunteered: ['Volunteered'],
-        open: [`${event.volunteersIds.length} of ${event.volunteersNeeded}`, 'Volunteer(s) needed'],
-        full: ['Team is full'],
-    };
-
-    const organizerPhone = organizer?.mobile.replace(/[^\d+]/g, '');
 
     const openUrl = (url: string) =>
         Linking.openURL(url).catch(() => Alert.alert('Unable to open', 'No app on this device can handle this action.'));
@@ -55,12 +39,12 @@ export default function EventDetails({ route, navigation }: StackScreenProps<App
 
     const handleText = () => organizerPhone && openUrl(`sms:${organizerPhone}`);
 
-    const handleShowRoutes = () => openUrl(getMapsUrl(event.position));
+    const handleGetDirections = () => openUrl(getDirectionsUrl(event.position));
 
     const handleShare = () =>
         Share.share({
             title: event.name,
-            message: `${event.name} - ${eventDate.toDateString()} at ${formatAMPM(eventDate)}\n\n${event.description}`,
+            message: `${event.name} - ${eventDate} at ${eventTime}\n\n${event.description}`,
         });
 
     const handleVolunteer = () => {
@@ -87,75 +71,112 @@ export default function EventDetails({ route, navigation }: StackScreenProps<App
                 <Text style={styles.title}>{event.name}</Text>
                 {organizer && (
                     <Text style={styles.organizer}>
-                        Organized by {organizer.name.first} {organizer.name.last}
+                        organized by {organizer.name.first} {organizer.name.last}
                     </Text>
                 )}
                 <Text style={styles.description}>{event.description}</Text>
 
-                <Spacer size={24} />
-                <View style={styles.row}>
-                    <InfoBox
-                        color="#00A3FF"
-                        featherIconName="calendar"
-                        lines={[eventDate.toDateString(), formatAMPM(eventDate)]}
-                    />
-                    <Spacer horizontal size={16} />
-                    <InfoBox color={statusColors[status]} featherIconName={statusIcons[status]} lines={statusLines[status]} />
-                </View>
+                <View style={[styles.row, styles.section]}>
+                    <InfoBox color="#00A3FF" backgroundColor="#E5F6FF" borderColor="#00A3FF" featherIconName="calendar">
+                        <Text style={[styles.boxText, { color: '#00A3FF' }]}>
+                            {eventDate}
+                            {'\n'}
+                            {eventTime}
+                        </Text>
+                    </InfoBox>
 
-                <Spacer size={16} />
-                <View style={styles.row}>
-                    <BigButton
-                        label="Show routes on map"
-                        color="#4D6F80"
-                        featherIconName="map-pin"
-                        onPress={handleShowRoutes}
-                    />
-                </View>
+                    {status === 'volunteered' && (
+                        <InfoBox color="#00A3FF" backgroundColor="#E5F6FF" borderColor="#00A3FF" featherIconName="check">
+                            <Text style={[styles.boxText, { color: '#00A3FF' }]}>Volunteered</Text>
+                        </InfoBox>
+                    )}
 
-                {status === 'volunteered' && (
-                    <>
-                        <Spacer size={16} />
-                        <View style={styles.row}>
-                            <BigButton
-                                label="Call"
-                                color="#00A3FF"
-                                featherIconName="phone"
-                                disabled={!organizerPhone}
-                                onPress={handleCall}
-                            />
-                            <Spacer horizontal size={16} />
-                            <BigButton
-                                label="Text"
-                                color="#00A3FF"
-                                featherIconName="message-circle"
-                                disabled={!organizerPhone}
-                                onPress={handleText}
-                            />
-                        </View>
-                    </>
-                )}
+                    {status === 'open' && (
+                        <InfoBox color="#FF8700" backgroundColor="#F2E6D9" borderColor="#FF8700">
+                            <Text style={styles.volunteersCount}>
+                                {event.volunteersIds.length}
+                                <Text style={styles.volunteersCountOf}> of </Text>
+                                {event.volunteersNeeded}
+                            </Text>
+                            <Text style={[styles.boxText, { color: '#FF8700' }]}>Volunteer(s){'\n'}needed</Text>
+                        </InfoBox>
+                    )}
+
+                    {status === 'full' && (
+                        <InfoBox color="#8FA7B3" backgroundColor="#D3E2E5" borderColor="#A1BCC6" featherIconName="slash">
+                            <Text style={[styles.boxText, { color: '#8FA7B3' }]}>Team is full</Text>
+                        </InfoBox>
+                    )}
+                </View>
 
                 {status !== 'full' && (
-                    <>
-                        <Spacer size={16} />
-                        <View style={styles.row}>
-                            <BigButton label="Share" color="#00A3FF" featherIconName="share-2" onPress={handleShare} />
-                            {status === 'open' && (
-                                <>
-                                    <Spacer horizontal size={16} />
-                                    <BigButton
-                                        label="Volunteer"
-                                        color="#FF8700"
-                                        featherIconName="plus"
-                                        disabled={isSaving}
-                                        onPress={handleVolunteer}
-                                    />
-                                </>
-                            )}
-                        </View>
-                    </>
+                    <View style={[styles.row, styles.section]}>
+                        <BigButton
+                            style={styles.rowButton}
+                            label="Share"
+                            color="#00A3FF"
+                            featherIconName="share-2"
+                            onPress={handleShare}
+                        />
+
+                        {status === 'volunteered' && (
+                            <>
+                                <BigButton
+                                    style={styles.rowButton}
+                                    label="Call"
+                                    color="#00A3FF"
+                                    featherIconName="phone"
+                                    disabled={!organizerPhone}
+                                    onPress={handleCall}
+                                />
+                                <BigButton
+                                    style={styles.rowButton}
+                                    label="Text"
+                                    color="#00A3FF"
+                                    featherIconName="message-circle"
+                                    disabled={!organizerPhone}
+                                    onPress={handleText}
+                                />
+                            </>
+                        )}
+
+                        {status === 'open' && (
+                            <BigButton
+                                style={styles.rowButton}
+                                label="Volunteer"
+                                color="#FF8700"
+                                featherIconName="plus"
+                                disabled={isSaving}
+                                onPress={handleVolunteer}
+                            />
+                        )}
+                    </View>
                 )}
+
+                <View style={styles.divider} />
+
+                <View style={styles.mapContainer} pointerEvents="none">
+                    <MapView
+                        provider={PROVIDER_GOOGLE}
+                        style={styles.map}
+                        customMapStyle={customMapStyle}
+                        initialRegion={{ ...event.position, ...MapSettings.DEFAULT_DELTA }}
+                        toolbarEnabled={false}
+                    >
+                        <Marker coordinate={event.position}>
+                            <Image resizeMode="contain" style={{ width: 48, height: 54 }} source={mapMarkerImg} />
+                        </Marker>
+                    </MapView>
+                </View>
+
+                <View style={[styles.row, styles.directionsButton]}>
+                    <BigButton
+                        label="Get Directions to Event"
+                        color="#4D6F80"
+                        featherIconName="map-pin"
+                        onPress={handleGetDirections}
+                    />
+                </View>
             </View>
         </ScrollView>
     );
@@ -164,6 +185,7 @@ export default function EventDetails({ route, navigation }: StackScreenProps<App
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#EBF1F5',
     },
 
     content: {
@@ -172,7 +194,7 @@ const styles = StyleSheet.create({
 
     image: {
         width: '100%',
-        height: 240,
+        height: 210,
     },
 
     imagePlaceholder: {
@@ -185,26 +207,74 @@ const styles = StyleSheet.create({
 
     title: {
         fontFamily: 'Nunito_700Bold',
-        fontSize: 30,
+        fontSize: 24,
         color: '#4D6F80',
     },
 
     organizer: {
-        fontFamily: 'Nunito_600SemiBold',
+        fontFamily: 'Nunito_400Regular',
         fontSize: 14,
-        color: '#8FA7B3',
-        marginTop: 4,
+        color: '#4D6F80',
     },
 
     description: {
-        fontFamily: 'Nunito_600SemiBold',
-        fontSize: 15,
-        lineHeight: 24,
+        fontFamily: 'Nunito_400Regular',
+        fontSize: 16,
+        lineHeight: 18,
         color: '#5C8599',
-        marginTop: 16,
+        marginTop: 12,
+    },
+
+    section: {
+        marginTop: 24,
     },
 
     row: {
         flexDirection: 'row',
+        gap: 8,
+    },
+
+    boxText: {
+        fontFamily: 'Nunito_600SemiBold',
+        fontSize: 15,
+        lineHeight: 20,
+        textAlign: 'center',
+    },
+
+    volunteersCount: {
+        fontFamily: 'Nunito_800ExtraBold',
+        fontSize: 30,
+        color: '#FF8700',
+        marginBottom: 4,
+    },
+
+    volunteersCountOf: {
+        fontSize: 20,
+    },
+
+    rowButton: {
+        paddingHorizontal: 8,
+    },
+
+    divider: {
+        height: 1,
+        backgroundColor: '#D3E2E5',
+        marginVertical: 24,
+    },
+
+    mapContainer: {
+        height: 320,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#B3DAE2',
+        overflow: 'hidden',
+    },
+
+    map: {
+        flex: 1,
+    },
+
+    directionsButton: {
+        marginTop: 16,
     },
 });

@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 
 import { NavigationContainer } from '@react-navigation/native';
@@ -46,9 +47,17 @@ export default function Routes() {
                             headerShown: true,
                             title: 'Event',
                             headerTitleAlign: 'center',
-                            headerTintColor: '#00A3FF',
-                            headerTitleStyle: { fontFamily: 'Nunito_700Bold', color: '#8FA7B3', fontSize: 15 },
-                            headerStyle: { backgroundColor: '#F9FAFC' },
+                            headerBackTitle: '',
+                            headerBackImage: () => (
+                                <Feather name="arrow-left" size={24} color="#15B6D6" style={{ marginLeft: 16 }} />
+                            ),
+                            headerTitleStyle: { fontFamily: 'Nunito_600SemiBold', color: '#8FA7B3', fontSize: 16 },
+                            headerStyle: {
+                                backgroundColor: '#F9FAFC',
+                                borderBottomWidth: 1,
+                                borderBottomColor: '#DDE3F0',
+                            },
+                            headerShadowVisible: false,
                         }}
                     />
                 </Navigator>
