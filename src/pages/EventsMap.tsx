@@ -15,8 +15,11 @@ import mapMarkerGreyImg from '../images/map-marker-grey.png';
 import mapMarkerImg from '../images/map-marker.png';
 import { AppStackParamList } from '../routes/AppStack';
 import * as api from '../services/api';
+import { getFromNetworkFirst } from '../services/caching';
 import { EventStatus, VolunteeringEvent } from '../types/Event';
 import { getEventStatus, isFutureEvent } from '../utils/events';
+
+const EVENTS_CACHE_KEY = 'events';
 
 const markerImages: Record<EventStatus, ImageSourcePropType> = {
     open: mapMarkerImg,
@@ -34,11 +37,16 @@ export default function EventsMap(props: StackScreenProps<AppStackParamList, 'Ev
     const [userLocation, setUserLocation] = useState<LatLng>();
 
     // Reload events and the user location every time the map screen gets focus,
-    // so changes made on the details screen (e.g. volunteering) are reflected here.
+    // so changes made on other screens (volunteering, creating an event) are reflected here.
+    // Events come from the API when the network is available (and are cached in AsyncStorage);
+    // otherwise the last cached list is used.
     useFocusEffect(
         useCallback(() => {
-            api.getEvents()
-                .then((response) => setEvents(response.data.filter(isFutureEvent)))
+            getFromNetworkFirst<VolunteeringEvent[]>(
+                EVENTS_CACHE_KEY,
+                api.getEvents().then((response) => response.data)
+            )
+                .then((allEvents) => setEvents(allEvents.filter(isFutureEvent)))
                 .catch((error) => console.log(error));
             getUserLocation().then(setUserLocation);
         }, [])
@@ -59,7 +67,9 @@ export default function EventsMap(props: StackScreenProps<AppStackParamList, 'Ev
         }
     };
 
-    const handleNavigateToCreateEvent = () => {};
+    const handleNavigateToCreateEvent = () => {
+        navigation.navigate('SelectEventLocation');
+    };
 
     const handleNavigateToEventDetails = (event: VolunteeringEvent) => {
         navigation.navigate('EventDetails', { event });
@@ -109,7 +119,9 @@ export default function EventsMap(props: StackScreenProps<AppStackParamList, 'Ev
             </MapView>
 
             <View style={styles.footer}>
-                <Text style={styles.footerText}>{events.length} event(s) found</Text>
+                <Text style={styles.footerText}>
+                    {events.length} {events.length === 1 ? 'event' : 'events'} found
+                </Text>
                 <RectButton
                     style={[styles.smallButton, { backgroundColor: '#00A3FF' }]}
                     onPress={handleNavigateToCreateEvent}
