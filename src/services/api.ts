@@ -37,3 +37,7 @@ export const updateEventVolunteers = (
 ): Promise<AxiosResponse<VolunteeringEvent>> => {
     return api.patch(`/events/${eventId}`, { volunteersIds });
 };
+
+export const createEvent = (event: VolunteeringEvent): Promise<AxiosResponse<VolunteeringEvent>> => {
+    return api.post('/events', event);
+};

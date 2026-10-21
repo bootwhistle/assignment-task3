@@ -1,6 +1,6 @@
 import { StackScreenProps } from '@react-navigation/stack';
 import React, { useContext, useEffect, useState } from 'react';
-import { Alert, Image, Linking, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Linking, Platform, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import customMapStyle from '../../map-style.json';
 import BigButton from '../components/BigButton';
@@ -157,7 +157,7 @@ export default function EventDetails({ route, navigation }: StackScreenProps<App
 
                 <View style={styles.mapContainer} pointerEvents="none">
                     <MapView
-                        provider={PROVIDER_GOOGLE}
+                        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
                         style={styles.map}
                         customMapStyle={customMapStyle}
                         initialRegion={{ ...event.position, ...MapSettings.DEFAULT_DELTA }}

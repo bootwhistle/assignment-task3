@@ -29,15 +29,13 @@ To use `my-json-server`, make sure your `db.json` is located at the repo root.
 
 ## Setting up the image upload API
 
-Update the file `src/services/imageApi.ts`.
+Event pictures are uploaded to Freeimage.host (https://freeimage.host/page/api) by `src/services/imageApi.ts`.
 
-You can use any hosting service of your preference. In this case, we will use ImgBB API: https://api.imgbb.com/.
-Sign up for free at https://imgbb.com/signup, get your API key and add it to the .env file in your root folder.
-
-To run the app in your local environment, you will need to set the IMGBB_API_KEY when starting the app using:
+The app works out of the box with the public API key published on the Freeimage.host API page (set in `app.config.ts`).
+To use your own key, set FREEIMAGE_API_KEY when starting the app:
 
 ```
-IMGBB_API_KEY="insert_your_api_key_here" npx expo start
+FREEIMAGE_API_KEY="insert_your_api_key_here" npx expo start
 ```
 
 When creating your app build or publishing, import your secret values to EAS running:
